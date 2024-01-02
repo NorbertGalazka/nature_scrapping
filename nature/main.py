@@ -64,18 +64,32 @@ def get_article_data(article):
     return Article(title=title, author=author, date=date, description=description)
 
 
-url = 'https://www.nature.com/subjects/earth-and-environmental-sciences/nature'
+def main():
+    subjects = ['physical-sciences', 'earth-and-environmental-sciences',
+                'biological-sciences', 'health-sciences', 'scientific-community-and-society']
 
-articles = get_all_articles_from_site(get_all_html_code(url=url))
+    article_objects = []
 
-article_objects = []
+    for subject in subjects:
+        basic_url = f'https://www.nature.com/subjects/' \
+                    f'{subject}/nature?searchType=journalSearch&sort=PubDate&page=1'
+        for page in range(get_max_page(get_all_html_code(url=basic_url))):
+            url = f'https://www.nature.com/' \
+                  f'subjects/{subject}/nature?searchType=journalSearch&sort=PubDate&page={page+1}'
+            print(f'pobieram artykuły {subject} ze strony {page + 1}')
 
-for article in articles:
-    article_objects.append(get_article_data(article))
+            articles_in_single_page = get_all_articles_from_site(get_all_html_code(url=url))
 
-# for article_obj in article_objects:
-#     print(article_obj.date, article_obj.title)
+            for article_in_single_page in articles_in_single_page:
+                article_objects.append(get_article_data(article_in_single_page))
+
+    for article_obj in article_objects:
+        print(article_obj.date, article_obj.title)
 
 
-print(get_max_page(get_all_html_code(url=url)))
+if __name__ == "__main__":
+    main()
+
+
+
 
