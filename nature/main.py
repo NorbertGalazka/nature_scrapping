@@ -11,6 +11,24 @@ class Article:
     date: str
 
 
+def get_max_page(soup):
+    raw_list_of_pages = []
+    processed_list = []
+    max_page_soup = soup.find_all(class_='c-pagination__item')
+    for element in max_page_soup:
+        try:
+            raw_list_of_pages.append(element['data-page'])
+        except KeyError:
+            continue
+    for element in raw_list_of_pages:
+        try:
+            processed_list.append(int(element))
+        except ValueError:
+            continue
+
+    return max(processed_list)
+
+
 def get_all_html_code(url: str):
     response = requests.get(url)
     if response.status_code == 200:
@@ -55,6 +73,9 @@ article_objects = []
 for article in articles:
     article_objects.append(get_article_data(article))
 
-for article_obj in article_objects:
-    print(article_obj.date, article_obj.title)
+# for article_obj in article_objects:
+#     print(article_obj.date, article_obj.title)
+
+
+print(get_max_page(get_all_html_code(url=url)))
 
