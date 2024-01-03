@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
-import requests
 from dataclasses import dataclass
+import aiohttp
+import asyncio
 
 
 @dataclass
@@ -11,7 +12,7 @@ class Article:
     date: str
 
 
-def get_max_page(soup):
+async def get_max_page(soup):
     raw_list_of_pages = []
     processed_list = []
     max_page_soup = soup.find_all(class_='c-pagination__item')
@@ -29,22 +30,26 @@ def get_max_page(soup):
     return max(processed_list)
 
 
-def get_all_html_code(url: str):
-    response = requests.get(url)
-    if response.status_code == 200:
-        return BeautifulSoup(response.text, 'html.parser')
+async def get_all_html_code(url: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                html_code = await response.text()
+                return BeautifulSoup(html_code, 'html.parser')
     return None
 
 
-def get_all_articles_from_site(soup):
-    articles_from_site = None
-
-    content = soup.find('ul', class_= 'ma0 mb-negative-2 clean-list')
-
-    if content:
-        articles_from_site = content.find_all('li', class_='border-gray-medium border-bottom-1 pb20 mt20')
-
-    return articles_from_site
+async def get_all_articles_from_site(session, url):
+    async with session.get(url) as response:
+        if response.status == 200:
+            html_code = await response.text()
+            soup = BeautifulSoup(html_code, 'html.parser')
+            articles_from_site = None
+            content = soup.find('ul', class_='ma0 mb-negative-2 clean-list')
+            if content:
+                articles_from_site = content.find_all('li', class_='border-gray-medium border-bottom-1 pb20 mt20')
+            return articles_from_site
+    return None
 
 
 def get_article_data(article):
@@ -64,32 +69,34 @@ def get_article_data(article):
     return Article(title=title, author=author, date=date, description=description)
 
 
-def main():
+async def main():
     subjects = ['physical-sciences', 'earth-and-environmental-sciences',
                 'biological-sciences', 'health-sciences', 'scientific-community-and-society']
 
     article_objects = []
 
-    for subject in subjects:
-        basic_url = f'https://www.nature.com/subjects/' \
-                    f'{subject}/nature?searchType=journalSearch&sort=PubDate&page=1'
-        for page in range(get_max_page(get_all_html_code(url=basic_url))):
-            url = f'https://www.nature.com/' \
-                  f'subjects/{subject}/nature?searchType=journalSearch&sort=PubDate&page={page+1}'
-            print(f'pobieram artykuły {subject} ze strony {page + 1}')
+    async with aiohttp.ClientSession() as session:
+        for subject in subjects:
+            basic_url = f'https://www.nature.com/subjects/{subject}/nature?searchType=journalSearch&sort=PubDate&page=1'
+            max_page = await get_max_page(await get_all_html_code(url=basic_url))
 
-            articles_in_single_page = get_all_articles_from_site(get_all_html_code(url=url))
+            tasks = []
+            for page in range(max_page):
+                url = f'https://www.nature.com/subjects/{subject}/nature?searchType=journalSearch&sort=PubDate&page={page + 1}'
+                print(f'pobieram artykuły {subject} ze strony {page + 1}')
 
-            for article_in_single_page in articles_in_single_page:
-                article_objects.append(get_article_data(article_in_single_page))
+                tasks.append(get_all_articles_from_site(session, url))
+
+            articles_pages = await asyncio.gather(*tasks)
+
+            for articles_in_single_page in articles_pages:
+                if articles_in_single_page:
+                    for article_in_single_page in articles_in_single_page:
+                        article_objects.append(get_article_data(article_in_single_page))
 
     for article_obj in article_objects:
         print(article_obj.date, article_obj.title)
 
-
 if __name__ == "__main__":
-    main()
-
-
-
+    asyncio.run(main())
 
